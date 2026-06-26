@@ -1,17 +1,21 @@
 #!/usr/bin/env python3
-"""Genereert een Doofinder-JSON-feed van ALLE Shopify-blogartikelen (Vijvercentrum)."""
-import os, sys, json, re, time, urllib.request
+"""Genereert Doofinder-feeds (CSV + JSON) van ALLE Shopify-blogartikelen (Vijvercentrum).
+CSV is de bron voor de Doofinder content-index (URL-indexering)."""
+import os, sys, json, csv, re, time, urllib.request
 
 STORE = re.sub(r'^https?://|/$', '', os.environ.get('SHOPIFY_STORE_URL', ''))
 TOKEN = os.environ.get('SHOPIFY_ACCESS_TOKEN')
 API = os.environ.get('SHOPIFY_API_VERSION', '2026-01')
 BASE = 'https://vijvercentrum.nl'
-OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'blog_feed.json')
+HERE = os.path.dirname(os.path.abspath(__file__))
+OUT_JSON = os.path.join(HERE, 'blog_feed.json')
+OUT_CSV = os.path.join(HERE, 'blog_feed.csv')
 URL = f'https://{STORE}/admin/api/{API}/graphql.json'
 Q = """query($c:String){ articles(first:100, after:$c, sortKey:PUBLISHED_AT, reverse:true){
  pageInfo{hasNextPage endCursor}
  nodes{ id title handle summary body publishedAt tags image{url} blog{handle title} } } }"""
 TAGRE = re.compile(r'<[^>]+>'); WSRE = re.compile(r'\s+')
+COLS = ['id','title','link','description','image_link','blog','tags','date','df_grouping_id']
 
 def strip(h, n=600):
     if not h: return ''
@@ -43,15 +47,21 @@ def main():
                 'description': strip(n.get('summary') or n.get('body','')),
                 'image_link': (n.get('image') or {}).get('url',''),
                 'blog': (n.get('blog') or {}).get('title',''),
-                'tags': n.get('tags',[]),
+                'tags': '/'.join(n.get('tags',[]) or []),
                 'date': n.get('publishedAt',''),
                 'df_grouping_id': 'article',
             })
         if not a['pageInfo']['hasNextPage']: break
         c = a['pageInfo']['endCursor']; time.sleep(0.5)
-    with open(OUT,'w',encoding='utf-8') as f:
+    # CSV (bron voor Doofinder content-index)
+    with open(OUT_CSV,'w',encoding='utf-8',newline='') as f:
+        w = csv.DictWriter(f, fieldnames=COLS, quoting=csv.QUOTE_ALL)
+        w.writeheader()
+        for it in items: w.writerow(it)
+    # JSON (backup/leesbaar)
+    with open(OUT_JSON,'w',encoding='utf-8') as f:
         json.dump(items, f, ensure_ascii=False, indent=1)
-    print(f'OK {len(items)} artikelen -> {OUT}')
+    print(f'OK {len(items)} artikelen -> CSV + JSON')
 
 if __name__ == '__main__':
     main()
