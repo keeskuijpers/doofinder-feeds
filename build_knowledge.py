@@ -37,7 +37,7 @@ while True:
             'blog':(n.get('blog') or {}).get('title','Overig'),
             'title':n.get('title',''),
             'link':f"{BASE}/blogs/{bh}/{n['handle']}" if bh else '',
-            'text':strip(n.get('body') or n.get('summary',''),750),
+            'text':strip(n.get('body') or n.get('summary',''),440),
         })
     if not a['pageInfo']['hasNextPage']: break
     c=a['pageInfo']['endCursor']; time.sleep(0.5)
